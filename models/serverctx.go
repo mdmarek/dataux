@@ -45,6 +45,7 @@ func (m *ServerCtx) Init() error {
 	// Copy over the nats, etcd info from config to
 	// Planner grid
 	planner.GridConf.NatsServers = m.Config.Nats
+	u.Infof("nats: %v", m.Config.Nats)
 	planner.GridConf.EtcdServers = m.Config.Etcd
 
 	// how many worker nodes?

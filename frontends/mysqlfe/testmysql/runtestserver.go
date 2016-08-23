@@ -176,7 +176,7 @@ func NewTestServerForDb(t *testing.T, db string) {
 		EtcdCluster = embeddedetcd.TestClusterOf1()
 		EtcdCluster.Launch()
 		etcdServers := EtcdCluster.HTTPMembers()[0].ClientURLs
-		//u.Infof("etcdServers: %#v", etcdServers)
+		u.Infof("etcdServers: %#v", etcdServers)
 		Conf.Etcd = etcdServers
 
 		natsunit.StartEmbeddedNATS()
@@ -185,9 +185,10 @@ func NewTestServerForDb(t *testing.T, db string) {
 
 		ServerCtx = models.NewServerCtx(Conf)
 		ServerCtx.Init()
+		ServerCtx.Grid.InitMaster()
 		quit := make(chan bool)
 		go func() {
-			ServerCtx.Grid.RunMaster(quit)
+			ServerCtx.Grid.Run(quit)
 		}()
 
 		Schema, _ = ServerCtx.Schema(db)

@@ -45,7 +45,8 @@ func RunWorkerNodes(quit chan bool, nodeCt int, r *datasource.Registry) {
 		go func(nodeId int) {
 			s := NewServerGrid(nodeCt, r)
 			s.Conf.Hostname = NodeName2(nextId, uint64(nodeId))
-			err := s.RunWorker(quit) // blocking
+			s.InitWorker()
+			err := s.Run(quit) // blocking
 			if err != nil {
 				u.Warnf("could not start worker")
 			}

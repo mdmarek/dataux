@@ -45,53 +45,66 @@ type Server struct {
 	Grid       grid.Grid
 	started    bool
 	lastTaskId uint64
+	quit       chan bool
+	exit       <-chan bool
 }
 
-// Submits a Sql Select statement task for planning across multiple nodes
-func (m *Server) RunSqlMaster(completionTask exec.TaskRunner, ns *SourceNats, flow Flow, p *plan.Select) error {
+func (s *Server) Init(actorMaker grid.ActorMaker) error {
 
-	t := newSqlMasterTask(m, completionTask, ns, flow, p)
-	return t.Run()
-}
+	u.Debugf("%p grid etcd: %v nats:%v", s, s.Conf.EtcdServers, s.Conf.NatsServers)
 
-func (m *Server) RunWorker(quit chan bool) error {
-	//u.Debugf("%p starting grid worker", m)
-	actor, err := newActorMaker(m.Conf)
-	if err != nil {
-		u.Errorf("failed to make actor maker: %v", err)
-		return err
+	if s.Grid != nil {
+		u.Warnf("ack, replacing grid?")
 	}
-	return m.runMaker(quit, actor)
-}
-
-func (m *Server) RunMaster(quit chan bool) error {
-	//u.Debugf("%p start grid master", m)
-	return m.runMaker(quit, &nilMaker{})
-}
-
-func (s *Server) runMaker(quit chan bool, actorMaker grid.ActorMaker) error {
-
 	// We are going to start a "Grid" with specified maker
 	//   - nilMaker = "master" only used for submitting tasks, not performing them
 	//   - normal maker;  performs specified work units
 	s.Grid = grid.New(s.Conf.GridName, s.Conf.Hostname, s.Conf.EtcdServers, s.Conf.NatsServers, actorMaker)
-
-	//u.Debugf("%p created new distributed grid sql job maker: %#v", s, s.Grid)
 	exit, err := s.Grid.Start()
 	if err != nil {
 		u.Errorf("failed to start grid: %v", err)
 		return fmt.Errorf("error starting grid %v", err)
 	}
+	s.exit = exit
+	return nil
+}
+func (s *Server) InitMaster() error {
+	return s.Init(&nilMaker{})
+}
+func (s *Server) InitWorker() error {
+	u.Debugf("%p starting grid worker", s)
+	actor, err := newActorMaker(s.Conf)
+	if err != nil {
+		u.Errorf("failed to make actor maker: %v", err)
+		return err
+	}
+	return s.Init(actor)
+}
+
+// Submits a Sql Select statement task for planning across multiple nodes
+func (s *Server) RunSqlMaster(completionTask exec.TaskRunner, ns *SourceNats, flow Flow, p *plan.Select) error {
+
+	t := newSqlMasterTask(s, completionTask, ns, flow, p)
+	return t.Run()
+}
+
+func (s *Server) Run(quit chan bool) error {
+	return s.runMaker(quit)
+}
+
+func (s *Server) runMaker(quit chan bool) error {
 
 	defer func() {
 		u.Debugf("defer grid worker complete: %s", s.Conf.Hostname)
 		s.Grid.Stop()
 	}()
 
+	s.quit = quit
+
 	complete := make(chan bool)
 
 	j := condition.NewJoin(s.Grid.Etcd(), 30*time.Second, s.Grid.Name(), "hosts", s.Conf.Hostname)
-	err = j.Join()
+	err := j.Join()
 	if err != nil {
 		u.Errorf("failed to register grid node: %v", err)
 		os.Exit(1)
@@ -102,11 +115,11 @@ func (s *Server) runMaker(quit chan bool, actorMaker grid.ActorMaker) error {
 		defer ticker.Stop()
 		for {
 			select {
-			case <-quit:
+			case <-s.quit:
 				//u.Debugf("quit signal")
 				close(complete)
 				return
-			case <-exit:
+			case <-s.exit:
 				//u.Debugf("worker grid exit??")
 				return
 			case <-ticker.C:
@@ -130,7 +143,7 @@ func (s *Server) runMaker(quit chan bool, actorMaker grid.ActorMaker) error {
 	case <-complete:
 		u.Debugf("got complete signal")
 		return nil
-	case <-exit:
+	case <-s.exit:
 		//u.Debug("Shutting down, grid exited")
 		return nil
 	case <-w.WatchError():
@@ -140,7 +153,7 @@ func (s *Server) runMaker(quit chan bool, actorMaker grid.ActorMaker) error {
 		s.started = true
 		//u.Debugf("%p now started", s)
 	}
-	<-exit
+	<-s.exit
 	//u.Debug("shutdown complete")
 	return nil
 }
