@@ -81,7 +81,7 @@ func (m *ExecutorGrid) Finalize(resultWriter exec.Task) error {
 
 	m.JobExecutor.RootTask.Add(resultWriter)
 	m.JobExecutor.Setup()
-	//u.Debugf("planner.Finalize  %#v", m.JobExecutor.RootTask)
+	u.Debugf("planner.Finalize  %#v", m.JobExecutor.RootTask)
 	//u.Debugf("finished finalize")
 	return nil
 }
@@ -176,11 +176,11 @@ func (m *ExecutorGrid) WalkSelect(p *plan.Select) (exec.Task, error) {
 			if err := m.GridServer.RunSqlMaster(completionTask, natsSource, flow, p); err != nil {
 				u.Errorf("Could not run task", err)
 			}
-			//u.Debugf("%p closing Source due to a task (first?) completing", m)
+			u.Debugf("%p closing Source due to a task (first?) completing", m)
 			//time.Sleep(time.Millisecond * 30)
 			// If we close input source, then will it shutdown the rest?
 			natsSource.Close()
-			//u.Debugf("%p after closing NatsSource %p", m, natsSource)
+			u.Debugf("%p after closing NatsSource %p", m, natsSource)
 		}()
 		return localTask, nil
 	}
@@ -191,7 +191,7 @@ func (m *ExecutorGrid) WalkSelect(p *plan.Select) (exec.Task, error) {
 // WalkSelectPartition is ONLY called by child-dag's, ie the remote end of a distributed
 //  sql query, to allow setup before walking
 func (m *ExecutorGrid) WalkSelectPartition(p *plan.Select, part *schema.Partition) (exec.Task, error) {
-	//u.Infof("%p  %p childdag? %v", m, p, p.ChildDag)
+	u.Infof("%p  %p childdag? %v", m, p, p.ChildDag)
 	m.sp = p
 	m.distributed = true
 	return m.JobExecutor.WalkSelect(p)

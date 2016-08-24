@@ -32,7 +32,7 @@ func init() {
 
 func setupLogging() {
 	metafora.SetLogger(u.GetLogger()) // Configure metafora's logger
-	metafora.SetLogLevel(metafora.LogLevelWarn)
+	metafora.SetLogLevel(metafora.LogLevelDebug)
 	u.DiscardStandardLogger() // Discard non-sanctioned spammers
 }
 
@@ -52,7 +52,7 @@ func RunWorkerNodes(quit chan bool, nodeCt int, r *datasource.Registry) {
 			}
 		}(i)
 	}
-	time.Sleep(time.Millisecond * 80)
+	time.Sleep(time.Millisecond * 3000)
 }
 
 func NewServerGrid(nodeCt int, r *datasource.Registry) *Server {

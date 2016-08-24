@@ -104,6 +104,7 @@ func (s *Server) runMaker(quit chan bool) error {
 	complete := make(chan bool)
 
 	j := condition.NewJoin(s.Grid.Etcd(), 30*time.Second, s.Grid.Name(), "hosts", s.Conf.Hostname)
+	u.Infof("Grid:%p join %v", s.Grid.Etcd(), s.Grid.Name())
 	err := j.Join()
 	if err != nil {
 		u.Errorf("failed to register grid node: %v", err)
@@ -116,11 +117,11 @@ func (s *Server) runMaker(quit chan bool) error {
 		for {
 			select {
 			case <-s.quit:
-				//u.Debugf("quit signal")
+				u.Debugf("quit signal")
 				close(complete)
 				return
 			case <-s.exit:
-				//u.Debugf("worker grid exit??")
+				u.Debugf("worker grid exit??")
 				return
 			case <-ticker.C:
 				err := j.Alive()
@@ -136,15 +137,16 @@ func (s *Server) runMaker(quit chan bool) error {
 	defer w.Stop()
 
 	waitForCt := s.Conf.NodeCt + 1 // worker nodes + master
-	//u.Debugf("%p waiting for %d nodes to join", s, waitForCt)
+	u.Debugf("%p %s  waiting for %d nodes to join", s, s.Grid.Name(), waitForCt)
 	//u.LogTraceDf(u.WARN, 16, "")
 	started := w.WatchUntil(waitForCt)
+	u.Infof("found the watch!!!!")
 	select {
 	case <-complete:
 		u.Debugf("got complete signal")
 		return nil
 	case <-s.exit:
-		//u.Debug("Shutting down, grid exited")
+		u.Debug("Shutting down, grid exited")
 		return nil
 	case <-w.WatchError():
 		u.Errorf("failed to watch other hosts join: %v", err)
